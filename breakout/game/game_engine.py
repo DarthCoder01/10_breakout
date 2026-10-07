@@ -1,8 +1,9 @@
 """
-GameEngine: owns the paddle, ball, bricks, and lives.
+GameEngine: owns the paddle, ball, bricks, lives, and score.
 
 Task 2: 3 lives, game over, restart with R.
 Task 3: normal / strong / unbreakable bricks.
+Task 4: score with a combo multiplier.
 """
 
 import pygame
@@ -21,6 +22,9 @@ BRICK_GAP = 6
 BRICK_TOP_MARGIN = 50
 STARTING_LIVES = 3
 
+POINTS_PER_BRICK = 100
+MAX_MULTIPLIER = 10
+
 
 class GameEngine:
     def __init__(self):
@@ -32,6 +36,12 @@ class GameEngine:
         self.bricks = self._build_bricks()
         self.lives = STARTING_LIVES
         self.game_over = False
+        self.score = 0
+        self.combo = 0          # bricks destroyed in a row without missing
+
+    @property
+    def multiplier(self):
+        return min(1 + self.combo, MAX_MULTIPLIER)
 
     @staticmethod
     def _kind_for(row, col):
@@ -82,10 +92,14 @@ class GameEngine:
         for brick in self.bricks:
             if handle_ball_brick_collision(self.ball, brick):
                 if brick.hit():                 # True only when destroyed
+                    # Score at the current multiplier, then grow the combo
+                    self.score += POINTS_PER_BRICK * self.multiplier
+                    self.combo += 1
                     self.bricks.remove(brick)   # safe: we break right after
                 break
 
         if self.ball.is_below(HEIGHT):
+            self.combo = 0                      # missing the ball resets the combo
             self.lives -= 1
             if self.lives <= 0:
                 self.game_over = True
@@ -96,7 +110,9 @@ class GameEngine:
         from game import renderer
         renderer.draw_scene(surface, self.paddle, self.ball, self.bricks)
         breakable_left = sum(1 for b in self.bricks if b.breakable)
-        renderer.draw_text(surface, font, f"Bricks left: {breakable_left}", (10, 10))
+        renderer.draw_text(surface, font, f"Bricks: {breakable_left}", (10, 10))
+        renderer.draw_text(surface, font, f"Score: {self.score}", (180, 10))
+        renderer.draw_text(surface, font, f"Combo: x{self.multiplier}", (360, 10))
         renderer.draw_text(surface, font, f"Lives: {self.lives}", (WIDTH - 110, 10))
         if self.game_over:
             renderer.draw_banner(surface, font, "GAME OVER - Press R to restart")
