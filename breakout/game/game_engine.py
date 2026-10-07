@@ -1,14 +1,15 @@
 """
 GameEngine: owns the paddle, ball, bricks, and lives.
 
-Task 2: 3 lives, game over, and restart with the R key.
+Task 2: 3 lives, game over, restart with R.
+Task 3: normal / strong / unbreakable bricks.
 """
 
 import pygame
 
 from game.paddle import Paddle
 from game.ball import Ball
-from game.brick import Brick
+from game.brick import Brick, NORMAL, STRONG, UNBREAKABLE
 from game.collision import handle_ball_brick_collision
 from game.renderer import WIDTH, HEIGHT
 
@@ -32,6 +33,14 @@ class GameEngine:
         self.lives = STARTING_LIVES
         self.game_over = False
 
+    @staticmethod
+    def _kind_for(row, col):
+        if row == 1 and col in (0, BRICK_COLS - 1):
+            return UNBREAKABLE      # one on each edge of row 2
+        if row == 0:
+            return STRONG           # whole top row takes 3 hits
+        return NORMAL
+
     def _build_bricks(self):
         bricks = []
         total_width = BRICK_COLS * (BRICK_WIDTH + BRICK_GAP) - BRICK_GAP
@@ -40,7 +49,7 @@ class GameEngine:
             for col in range(BRICK_COLS):
                 x = start_x + col * (BRICK_WIDTH + BRICK_GAP)
                 y = BRICK_TOP_MARGIN + row * (BRICK_HEIGHT + BRICK_GAP)
-                bricks.append(Brick(x, y, BRICK_WIDTH, BRICK_HEIGHT))
+                bricks.append(Brick(x, y, BRICK_WIDTH, BRICK_HEIGHT, self._kind_for(row, col)))
         return bricks
 
     def _reset_ball(self):
@@ -72,9 +81,8 @@ class GameEngine:
 
         for brick in self.bricks:
             if handle_ball_brick_collision(self.ball, brick):
-                brick.hits_remaining -= 1
-                if brick.hits_remaining <= 0:
-                    self.bricks.remove(brick)
+                if brick.hit():                 # True only when destroyed
+                    self.bricks.remove(brick)   # safe: we break right after
                 break
 
         if self.ball.is_below(HEIGHT):
@@ -87,7 +95,8 @@ class GameEngine:
     def draw(self, surface, font):
         from game import renderer
         renderer.draw_scene(surface, self.paddle, self.ball, self.bricks)
-        renderer.draw_text(surface, font, f"Bricks left: {len(self.bricks)}", (10, 10))
+        breakable_left = sum(1 for b in self.bricks if b.breakable)
+        renderer.draw_text(surface, font, f"Bricks left: {breakable_left}", (10, 10))
         renderer.draw_text(surface, font, f"Lives: {self.lives}", (WIDTH - 110, 10))
         if self.game_over:
             renderer.draw_banner(surface, font, "GAME OVER - Press R to restart")
